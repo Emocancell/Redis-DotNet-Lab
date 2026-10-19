@@ -36,6 +36,6 @@ warm = request('/api/cache/warmup?count=100', 'POST')
 assert warm['loaded'] == 100
 assert request('/api/employees/42')['source'] == 'Redis'
 bench = request('/api/benchmark/42?runs=5')
-assert bench['runs'] == 5 and bench['redis']['avgMs'] >= 0
+assert bench['runs'] == 5 and bench['redisAvgMs'] >= 0
 request('/api/employees/42/salary', 'PATCH', {'salary': old})
 print('PASS: health, seed, list/filter, summary, miss/hit, salary/cache invalidation, warm-up, benchmark')
