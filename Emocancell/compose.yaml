@@ -1,0 +1,44 @@
+name: redis-hr-lab
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: redislab
+      POSTGRES_USER: lab
+      POSTGRES_PASSWORD: local_dev_only
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U lab -d redislab"]
+      interval: 5s
+      timeout: 3s
+      retries: 25
+  redis:
+    image: redis:8-alpine
+    command: ["redis-server","--appendonly","yes","--maxmemory","256mb","--maxmemory-policy","allkeys-lru"]
+    volumes: [redisdata:/data]
+    healthcheck:
+      test: ["CMD","redis-cli","ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 25
+  api:
+    build: .
+    environment:
+      ConnectionStrings__Postgres: "Host=postgres;Database=redislab;Username=lab;Password=local_dev_only"
+      ConnectionStrings__Redis: "redis:6379"
+    ports: ["127.0.0.1:5080:8080"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    restart: unless-stopped
+  redisinsight:
+    image: redis/redisinsight:latest
+    profiles: ["tools"]
+    ports: ["127.0.0.1:5540:5540"]
+    volumes: [insightdata:/data]
+volumes:
+  pgdata:
+  redisdata:
+  insightdata:
