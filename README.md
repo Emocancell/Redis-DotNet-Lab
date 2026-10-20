@@ -1,125 +1,105 @@
-# Redis HR Lab · ASP.NET Core 10 + PostgreSQL + Redis 8
+# Redis HR Lab V3 — People Intelligence
 
-**Tamamen sentetik 10.000 çalışan profili** üzerinde departman, yaş, cinsiyet ve brüt maaş analizi yapan; PostgreSQL sorgularını Redis cache ile karşılaştıran eğitim projesi. Gerçek kişi veya bordro verisi kullanılmaz.
+.NET 10, PostgreSQL 17, Redis 8 ve Docker Compose ile geliştirilmiş **tamamen sentetik personel yönetimi ve Redis performans laboratuvarı**. V3 sürümü; çalışan ekleme, bütün alanları güncelleme, silme, açık/koyu tema, gerçek yenile, Redis TTL/INCR/INFO/DBSIZE ve cache HIT/MISS testlerini içerir.
 
-## Başlatma
+> **Güvenlik:** Bu bir geliştirme demosudur. Herhangi bir giriş/kimlik doğrulama veya rol tabanlı yetki bulunmaz. Yalnızca Codespaces **Private** portundan veya izole geliştirme ortamında kullanın. Gerçek personel/maaş verisi yüklemeyin.
 
-Gerekenler: Docker Desktop (veya Docker Engine + Compose). Proje klasöründe:
+## V3'te değişenler
+
+- **Çalışan CRUD:** Ad, soyad, yaş, cinsiyet (kullanıcı girişi), departman, unvan, brüt maaş ve işe giriş tarihi alanlarında ekle, düzenle, sil.
+- **10.000+ kayıt:** Önceki çalışanlar ve maaşları korunur; yeni eklenen kayıtlara PostgreSQL sequence aracılığıyla ID atanır.
+- **Gerçek yenile:** `GET /api/summary?fresh=true` PostgreSQL'den taze özet getirir; tabloyu ve Redis telemetrisini de yeniler.
+- **Tema problemi:** Yeni `dashboard-v3.js` / `dashboard-v3.css` dosyaları tarayıcıdaki V2 önbellek çakışmasını önler. Varsayılan açık tema, tercihe bağlı koyu tema.
+- **Redis:** Cache-aside, key/TTL denetimi, warm-up, namespace reset, 25× benchmark, INFO memory/stats, DBSIZE ve 600 sn TTL ile atomik INCR.
+- **Cache invalidation:** Çalışan ekleme/değiştirme/silme sonrası `hrlab:epoch` artırılır; eski employee/summary cache anahtarları TTL sonunda silinir.
+- **Hata görünürlüğü:** Başarısız API isteklerinde toast ve ilgili panelde durum bilgisi gösterilir.
+
+## Mevcut V2 Codespaces'te kurulum (önerilir)
+
+1. `RedisHRLab-v3.zip` arşivini Codespaces'te **repo köküne**, `Dockerfile` ile aynı klasöre yükleyin.
+2. Terminalde:
+
+```bash
+unzip -o RedisHRLab-v3.zip -d .
+bash scripts/deploy_v3.sh
+```
+
+Bu script önce PostgreSQL yedeğini `${HOME}/redis-hr-backups` altına alır, ardından `db/migrations/003_employee_crud.sql` migration'ını çalıştırır, .NET API'yi yeniden derler, entegrasyon testlerini çalıştırır ve **testler geçerse** güncel dosyaları GitHub `main` branch'ine commit/push eder. Test geçmezse push yapılmaz. **Asla `docker compose down -v` kullanmayın.**
+
+Dashboard: Codespaces **Bağlantı Noktaları → 5080 → İletilen Adres** (görünürlük *Private*).
+
+## Yeni kurulum
 
 ```bash
 docker compose up --build -d
-docker compose ps
+# db/init.sql, yeni DB volume üzerinde sequence'i de oluşturur.
+python3 scripts/smoke_test.py
 ```
 
-**Web arayüzü:** http://localhost:5080
+Ağ yapılandırması bu projeye özgü Codespaces ortamındaki üç container'ın ortak network namespace kullandığı geçici geliştirme çözümünü korur; üretim için önerilmez.
 
-GitHub Codespaces kullanıyorsanız **Ports** sekmesinden 5080 portunu açıp görünürlüğünü **private** tutun. Docker imajlarını ve NuGet paketlerini çekmek için internet gerekir.
+## Temel API
 
-## Neler var?
-
-- 10.000 sentetik çalışan (8 departman, unvan, cinsiyet, yaş, maaş, işe giriş tarihi).
-- Çalışan tablosunda arama, departman ve cinsiyet filtreleri, sayfalama.
-- Brüt maaş güncelleme, PostgreSQL kalıcı saklama ve ilgili Redis anahtarlarının silinmesi.
-- Redis cache-aside: ilk sorgu **MISS/PostgreSQL**, ikinci sorgu **HIT/Redis**; TTL 300 sn.
-- İstatistik özeti: çalışan sayısı, ortalama maaş, aylık toplam, ortalama yaş, departman ve cinsiyet dağılımı; Redis TTL 60 sn.
-- Toplu cache warm-up: 100 / 1.000 / 10.000 kayıt.
-- Cache reset: namespace sürüm anahtarı (mevcut veriler TTL sonrası otomatik silinir).
-- PostgreSQL/Redis sorgu gecikmesi, ortalama ve p95 karşılaştırması; tek istemcili sentetik benchmark.
-- Health/status kartları, hit/miss metrikleri, etkileşim geçmişi.
-
-## API
-
-| Method | Endpoint | Açıklama |
+| Metot | Endpoint | İşlev |
 |---|---|---|
-| GET | `/api/status` | PostgreSQL/Redis durumu + hit/miss |
-| GET | `/api/departments` | Departmanlar |
-| GET | `/api/summary` | Analiz özeti, cache-aside |
-| GET | `/api/employees?page=1&pageSize=12&department=Network` | Arama ve filtre |
-| GET | `/api/employees/42` | Cache-aside tek çalışan |
-| PATCH | `/api/employees/42/salary` | `{"salary":90000}` |
-| POST | `/api/cache/warmup?count=100` | PostgreSQL → Redis |
-| POST | `/api/cache/reset` | Cache namespace sürümü |
-| GET | `/api/benchmark/42?runs=25` | Ardışık iki backend ölçümü |
+| GET | `/api/status` | PostgreSQL/Redis sağlık ve uygulama HIT/MISS |
+| GET | `/api/summary?fresh=true` | Taze departman/maaş özeti |
+| GET | `/api/employees?page=1&pageSize=12` | Personel filtreleme ve liste |
+| GET | `/api/employees/42` | Redis cache-aside tekil çalışan |
+| POST | `/api/employees` | Yeni çalışan (JSON `EmployeeInput`) |
+| PUT | `/api/employees/{id}` | Çalışanın tüm alanlarını güncelle |
+| DELETE | `/api/employees/{id}` | Demo çalışanını sil |
+| PATCH | `/api/employees/{id}/salary` | Eski V2 maaş endpoint'i (geriye uyumlu) |
+| GET | `/api/redis/stats` | Redis INFO ve DBSIZE |
+| GET | `/api/cache/inspect/42` | Cache anahtarı / TTL / byte |
+| POST | `/api/cache/warmup?count=100` | 100 / 1000 / 10000 çalışanı Redis'e yükle |
+| POST | `/api/cache/reset` | Namespace cache versiyonunu artır |
+| GET | `/api/benchmark/42?runs=25` | PostgreSQL vs Redis gecikme testi |
+| GET | `/api/redis/counter` | INCR sayaç ve TTL |
+| POST | `/api/redis/counter/increment` | Atomik artırma |
 
-## Test
+### Örnek çalışan ekleme
+
+```bash
+curl -i -X POST http://localhost:5080/api/employees \
+  -H 'Content-Type: application/json' \
+  -d '{"firstName":"Ece","lastName":"Demo","age":28,"gender":"Kadın","department":"Yazılım","position":"Yazılım Mühendisi","salary":85000,"startDate":"2025-09-01"}'
+```
+
+### Smoke test
 
 ```bash
 python3 scripts/smoke_test.py
 ```
 
-GitHub Actions'ta `.github/workflows/ci.yml` aynı smoke testini çalıştıracak şekilde tanımlıdır.
+Test, tek bir **sentetik test kişisi** ekler, bütün alanlarını günceller ve sonunda siler; mevcut gerçek uygulama kayıtlarını değiştirmez. Redis INCR sayaç test nedeniyle 1 artar. Testlerin başarısı Codespaces'teki çalışma çıktısıyla doğrulanmalıdır; kaynak kodun statik kontrolleri canlı testin yerini tutmaz.
 
-## Redis Insight (isteğe bağlı)
+## Veri koruma ve operasyon
 
-```bash
-docker compose --profile tools up -d redisinsight
+- Mevcut PostgreSQL volume korunur. `db/init.sql` yalnızca yeni/boş volume oluşturulurken çalışır.
+- V3 migration otomatik ID sequence ekler; **mevcut ID, isim, maaş, yaş, cinsiyet, departman değerlerini değiştirmez**.
+- V2'de düzeltilmiş sentetik isimler olduğu gibi kalır.
+- Kaydedilen çalışan verileri PostgreSQL'dedir. Redis değerleri geçici cache'tir; Redis'te kalıcı personel kaynağı tutulmaz.
+- `REDIS` istatistikleri uygulama HIT/MISS sayaçlarından farklıdır; sistemin kendi `keyspace_hits` ölçümünü içerir.
+- `256 MB allkeys-lru` yapılandırması demo ayarıdır. Production için yetkilendirme, TLS, secret yönetimi, güvenli veri modeli, audit trail, outbox/cache invalidation ve ölçeklendirme gereklidir.
+
+## Dosya düzeni
+
+```text
+src/RedisLab.Api/Program.cs                     API + Redis V2 uyumlu endpoint'ler
+src/RedisLab.Api/HrManagementEndpoints.cs        Yeni POST/PUT/DELETE REST işlemleri
+src/RedisLab.Api/wwwroot/index.html              V3 dashboard
+src/RedisLab.Api/wwwroot/dashboard-v3.js         Çalışan formu ve tüm buton davranışları
+src/RedisLab.Api/wwwroot/dashboard-v3.css        Açık/koyu tema
+scripts/deploy_v3.sh                             Yedek + migration + build + test + push
+scripts/smoke_test.py                            Redis ve CRUD entegrasyon testi
+db/migrations/003_employee_crud.sql              Mevcut DB'ye sequence
 ```
 
-http://localhost:5540 → Redis host: `127.0.0.1`, port: `6379` (Codespaces ortak ağ yapılandırması).
+## Doğrulama notu — V3
 
-## Sıfırlama / güvenlik
-
-```bash
-docker compose down
-# Veri hacimleri DAHİL tamamen sıfırlamak için:
-docker compose down -v
-```
-
-Veri tohumlama script'i **yalnızca boş PostgreSQL veri hacmiyle ilk başlangıçta** çalışır. Bu repodaki varsayılan şifre yalnızca izole test içindir. Uygulamada kullanıcı doğrulaması yoktur, yalnızca yerel veya **private Codespaces** ortamında çalıştırılmalıdır; internete açık hale getirmeyin. Maaş ve cinsiyet gibi alanlar gerçek kişilere ait olsaydı rol tabanlı yetkilendirme, denetim kaydı ve veri koruma gerektirirdi.
-
-**Mimari not:** Çalışan cache invalidation ilgili key'i siler, özet cache de silinir. Bir yazma sırasında Redis erişilemiyorsa kayıt PostgreSQL'e yazılır; Redis tekrar geldiğinde anahtar TTL bitene kadar eski veri döndürebilir. Üretimde transactional outbox / event tabanlı invalidation gibi güvence eklenmelidir. Bu demo, kurumsal Redis Enterprise özelliği gerektirmez.
-
-## GitHub web arayüzüyle tek seferde yükleme
-
-ZIP dosyasını çıkarın. GitHub'da `Emocancell/Redis-DotNet-Lab` → **Add file → Upload files** bölümünü açın. ZIP'i doğrudan yüklemeyin (GitHub açmaz). **Çıkardığınız klasörün içindeki tüm dosya ve klasörleri** seçip GitHub sayfasına sürükleyin; klasör yapısı korunur. Sonra `Commit changes` (veya `Propose changes`) deyin. Bu projede 15 kaynak dosyası bulunur.
-
-## GitHub'a kendi oturumunuzla gönderme
-
-ZIP'i çıkarın; Windows'ta Git kurulu ve GitHub'a giriş yapılmışken PowerShell'de proje klasörünü açıp:
-
-```powershell
-.\publish-to-github.ps1
-```
-
-Script `Emocancell/Redis-DotNet-Lab` repository'sini geçici klasöre klonlar, proje dosyalarını kopyalar, commit ve push yapar. GitHub hesabınıza erişim yalnızca kendi Git oturumunuz üzerinden kullanılır. Repo'da başka önemli dosyalar bulunuyorsa değişiklikleri kontrol edin.
-
-## Test ve doğrulama
-
-`python3 scripts/smoke_test.py` gerçek çalışır ortamda PostgreSQL'in 10.000 kayıtla başlamasını, Redis HIT/MISS, güncelleme sonrası cache temizliği, warm-up ve benchmark endpoint'ini kontrol eder. GitHub Actions da Docker Compose ile bu testi çalıştırmak için yapılandırılmıştır. Kaynak kodun statik kontrolleri yapılsa da hazırlandığı ortamda Docker ve .NET SDK bulunmadığından gerçek runtime smoke testinin başarılı olduğu iddia edilmez.
-
----
-
-## V2 — Açık Tema + Redis Motoru + Sentetik Adların Düzeltilmesi
-
-### Codespaces'te güvenli yükseltme
-
-Bu V2 ZIP paketini Codespaces'teki `Redis-DotNet-Lab` kök dizinine yükleyin; ardından:
-
-```bash
-unzip -o RedisHRLab-v2.zip -d .
-bash scripts/upgrade_v2.sh
-```
-
-`upgrade_v2.sh` önceki 10.000 örnek kaydın **yalnızca `full_name`** alanını demo cinsiyet etiketleriyle tutarlı hale getirir. Bir defaya mahsus yedek (`hrlab_names_before_v2`) alınır. **Maaş, yaş, unvan, departman, ID ve çalışma tarihleri korunur.** `db/init.sql` da sıfırdan kurulumlarda tutarlı sentetik isim üretecek biçimde güncellendi. Mevcut PostgreSQL volume'unu sıfırlamayın; `docker compose down -v` kullanmayın.
-
-**Kişi adından gerçek cinsiyet çıkarılamaz:** Buradaki eşleme yalnızca açıkça sentetik oluşturulmuş örnek veri için seçilmiş bir test kuralıdır.
-
-### Yeni özellikler
-
-- Açık tema varsayılan; koyu tema düğmesi ve tarayıcıda tercih hatırlama.
-- **Yenile** artık `/api/summary?fresh=true` ile PostgreSQL'den taze özet alır ve cache'i günceller. Buton durum/son yenileme saatini gösterir.
-- Redis `INFO memory/stats`, `DBSIZE`, **key inspector** ile kalan `TTL`/JSON boyutu.
-- Atomik `INCR` sayacı; 10 dakika TTL.
-- Geliştirilmiş hatalar ve `scripts/smoke_test.py` ile canlı end-to-end doğrulama.
-
-### V2 API uç noktaları
-
-| Metot | Yol | Açıklama |
-|---|---|---|
-| GET | `/api/summary?fresh=true` | Önbelleği atlayıp PostgreSQL'den taze özet getirir ve Redis'i günceller |
-| GET | `/api/redis/stats` | Redis INFO bellek/istatistik ve key sayısı |
-| GET | `/api/cache/inspect/42` | Çalışan key'i, TTL, kayıt boyutu |
-| GET | `/api/redis/counter` | INCR demo sayacı ve TTL |
-| POST | `/api/redis/counter/increment` | Redis atomik sayaç +1 |
-
-**Not:** Redis ve PostgreSQL aynı network namespace'ini paylaşır (`network_mode: service:postgres`); Codespaces'te tespit edilen ağ kısıtına özgü geliştirme çözümüdür. Üretime alınmadan önce servisler ayrılmalı; kimlik doğrulama ve güvenlik kontrolleri eklenmelidir. API'de gerçek HR verisi bulundurmayın.
+- Yeni arayüz için Chromium/Playwright ile sahte API yanıtları kullanılarak **açık/koyu tema, yenileme, çalışan ekleme/düzenleme/silme formu, Redis metrikleri, TTL, INCR, warm-up, reset, benchmark ve filtreleme** davranışları kontrol edildi; JavaScript hata olayı görülmedi.
+- HTML form ve buton ID'leri JavaScript ile eşleştirildi; JavaScript (`node --check`), Python ve Bash sözdizimi kontrol edildi.
+- Bu testler **gerçek .NET API'nin derlenmesi veya canlı PostgreSQL/Redis CRUD testi değildir**. Bunlar yalnızca Codespaces'te `scripts/deploy_v3.sh` aracılığıyla yapılır. Scriptin otomatik GitHub push'u sadece `scripts/smoke_test.py` başarılı olursa yapılır.
+- Smoke test, test amaçlı yeni kayıt ekleyip günceller ve sonrasında siler; `INCR` sayacı ise 1 artar.
+- ZIP dosyasının kendisi commit'e eklenmez.

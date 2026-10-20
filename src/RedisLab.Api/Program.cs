@@ -22,8 +22,15 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
 });
 builder.Services.AddSingleton<Metrics>();
 var app = builder.Build();
+// New UI assets must never mix with browser-cached V2 files.
+app.Use(async (context, next) =>
+{
+    context.Response.Headers["Cache-Control"] = "no-store, max-age=0";
+    await next();
+});
 app.UseDefaultFiles();
 app.UseStaticFiles();
+app.MapHrRoutes();
 
 app.MapGet("/api/status", async (NpgsqlDataSource pg, IConnectionMultiplexer redis, Metrics metrics) =>
 {
@@ -258,7 +265,7 @@ app.MapGet("/api/redis/stats", async (IConnectionMultiplexer redis) =>
 // Tekil cache anahtarını, kalan TTL ve JSON boyutunu denetle.
 app.MapGet("/api/cache/inspect/{id:int}", async (int id, IConnectionMultiplexer redis) =>
 {
-    if (id < 1 || id > 10000) return Results.BadRequest(new { error = "ID 1-10000 arası olmalı." });
+    if (id < 1) return Results.BadRequest(new { error = "ID pozitif olmalı." });
     try
     {
         var cache = redis.GetDatabase();

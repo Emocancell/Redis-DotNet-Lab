@@ -1,38 +1,76 @@
 <!doctype html>
-<html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Redis HR Lab — People Analytics</title><link rel="stylesheet" href="/styles.css"><script defer src="/app.js"></script></head>
-<body><div class="layout"><aside class="sidebar"><div class="logo"><span>R</span><div><strong>REDIS<span class="muted">LAB</span></strong><small>HR ANALYTICS PLATFORM</small></div></div><div class="navtitle">WORKSPACE</div><nav><a href="#overview" class="active">◈ &nbsp; Genel Bakış</a><a href="#people">▦ &nbsp; Çalışanlar</a><a href="#analysis">◷ &nbsp; Analitik</a><a href="#cache">⚡ &nbsp; Redis Lab</a><a href="#redis-deep">◆ &nbsp; Redis Motoru</a><a href="#events">≡ &nbsp; İşlem Geçmişi</a></nav><div class="sidelow"><span class="online-dot"></span> DEVELOPMENT ENVIRONMENT<div class="stack">.NET 10 · PostgreSQL 17<br>Redis 8 · Docker Compose</div><small>Demo verileri tamamen sentetiktir.</small></div></aside>
-<main><header><div><div class="eyebrow">WORKSPACE / HUMAN RESOURCES</div><h1 id="overview">People <em>Intelligence.</em></h1><p>Çalışan verilerini analiz et, Redis ile cache performansını gerçek zamanlı gözlemle.</p></div><div class="headright"><span id="service" class="pill">● Bağlanıyor</span><button id="theme-toggle" class="button secondary" title="Açık/koyu tema">☾ Koyu tema</button><button id="refresh" class="button primary" title="Taze PostgreSQL özeti getir">↻ Verileri Yenile</button></div><div class="last-refresh">Son kontrol: <span id="last-refresh">Henüz yenilenmedi</span> · Özet kaynağı: <strong id="summary-source">—</strong></div></header>
-<div class="metric-grid"><article class="metric"><span>TOPLAM ÇALIŞAN</span><strong id="count">—</strong><div class="metric-footer">PostgreSQL · 10.000 sentetik profil</div><div class="line teal"></div></article><article class="metric"><span>ORTALAMA MAAŞ</span><strong id="avg">—</strong><div class="metric-footer">Aylık brüt · TRY</div><div class="line purple"></div></article><article class="metric"><span>TOPLAM MAAŞ YÜKÜ</span><strong id="payroll">—</strong><div class="metric-footer">Aylık toplam · TRY</div><div class="line blue"></div></article><article class="metric"><span>REDIS HIT RATE</span><strong id="rate">—</strong><div class="metric-footer"><span id="hits">0</span> hit · <span id="misses">0</span> miss</div><div class="line orange"></div></article></div>
-<div class="section-grid" id="analysis"><section class="panel"><div class="panel-head"><div><div class="eyebrow">01 / WORKFORCE</div><h2>Departman Analizi</h2><p>Çalışan sayısının birimlere göre dağılımı</p></div><span class="panel-icon">▥</span></div><div id="departments" class="dept-list"><div class="empty">Veriler yükleniyor...</div></div></section><section class="panel"><div class="panel-head"><div><div class="eyebrow">02 / DEMOGRAPHICS</div><h2>Şirket Profili</h2><p>Sentetik çalışan topluluğunun yapısı</p></div><span class="panel-icon">◎</span></div><div class="profile-stats"><div><small>Ortalama yaş</small><strong id="age">—</strong></div><div><small>Departman sayısı</small><strong id="dept-total">—</strong></div></div><h3>Cinsiyet dağılımı</h3><div id="gender-bars" class="gender-bars"></div><div class="disclaimer">Bu veriler örnek amaçlı üretilmiştir. Gerçek çalışanları temsil etmez.</div></section></div>
-<section class="panel people-panel" id="people"><div class="panel-head"><div><div class="eyebrow">03 / POSTGRESQL DATABASE</div><h2>Çalışan Dizini</h2><p>İsme, pozisyona, departmana ve cinsiyete göre filtrele; seçili maaşı düzenle.</p></div><span id="table-count" class="count-pill">— kayıt</span></div><div class="filters"><input type="search" id="search" placeholder="⌕  İsim, pozisyon veya ID ara..."><select id="filter-dept"><option value="">Tüm departmanlar</option></select><select id="filter-gender"><option value="">Tüm cinsiyetler</option><option>Kadın</option><option>Erkek</option><option>Belirtmek istemiyor</option></select><button id="clear-filters" class="button secondary">Temizle</button></div><div class="table-wrap"><table><thead><tr><th>ÇALIŞAN</th><th>DEPARTMAN</th><th>POZİSYON</th><th>YAŞ</th><th>CİNSİYET</th><th>MAAŞ (BRÜT)</th><th></th></tr></thead><tbody id="employee-rows"><tr><td colspan="7">Yükleniyor...</td></tr></tbody></table></div><div class="pager"><span id="page-info">—</span><div><button id="prev" class="button secondary">← Önceki</button><button id="next" class="button secondary">Sonraki →</button></div></div><div class="editor hidden" id="editor"><strong id="edit-person">Maaş Güncelleme</strong><div class="edit-controls"><label>Yeni brüt maaş (₺)<input type="number" id="edit-salary" min="1000" max="1000000"></label><button id="save" class="button primary">Kaydet ve Cache'i Temizle</button><button id="cancel" class="button secondary">İptal</button></div></div></section>
-<div class="section-grid" id="cache"><section class="panel"><div class="panel-head"><div><div class="eyebrow">04 / CACHE EXPLORER</div><h2>Redis Okuma Testi</h2><p>Bir ID'yi arka arkaya sorgula: Cache MISS → HIT.</p></div><span class="panel-icon">ϟ</span></div><div class="search-row"><label>ÇALIŞAN ID<input type="number" id="lookup-id" value="42" min="1" max="10000"></label><button id="lookup" class="button primary">Çalışanı Sorgula ↗</button></div><div class="quick"><button data-id="1">#1</button><button data-id="42">#42</button><button data-id="1000">#1000</button><button data-id="9999">#9999</button></div><div id="lookup-result" class="cache-result">Sorgu yapmak için bir çalışan numarası gir.</div></section><section class="panel"><div class="panel-head"><div><div class="eyebrow">05 / PERFORMANCE & OPERATIONS</div><h2>Cache Kontrol Paneli</h2><p>Warm-up, invalidation ve gerçek sorgu süreleri.</p></div><span class="panel-icon">⚙</span></div><div class="toolbar"><select id="warmup-size"><option value="100">100 kayıt</option><option value="1000">1.000 kayıt</option><option value="10000">10.000 kayıt</option></select><button id="warmup" class="button primary">⚡ Redis'e Yükle</button></div><div class="toolbar"><button id="reset" class="button secondary">↻ Cache Reset</button><button id="bench" class="button outline">◷ Benchmark (25 ×)</button></div><div id="bench-result" class="benchmark"><div class="empty">Henüz benchmark yapılmadı.</div></div><div class="disclaimer">TTL: çalışan 300 sn, istatistik 60 sn · Redis cache-aside, PostgreSQL ana kaynaktır. Yenile düğmesi taze DB özeti getirir.</div></section></div>
+<html lang="tr" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>RedisLab HR | V3</title>
+  <link rel="stylesheet" href="/dashboard-v3.css?v=3.1">
+  <script defer src="/dashboard-v3.js?v=3.1"></script>
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand"><span class="brand-mark">R</span><div><b>REDIS<span>LAB</span></b><small>HR ANALYTICS · V3</small></div></div>
+    <div class="nav-label">ÇALIŞMA ALANI</div>
+    <nav aria-label="Bölümler">
+      <a href="#overview">◈ &nbsp; Genel bakış</a>
+      <a href="#employees">▤ &nbsp; Çalışan yönetimi</a>
+      <a href="#redis-lab">ϟ &nbsp; Redis cache</a>
+      <a href="#redis-engine">◉ &nbsp; Redis telemetri</a>
+      <a href="#events">≡ &nbsp; İşlem geçmişi</a>
+    </nav>
+    <div class="sidebar-note"><span class="dot"></span> DEMO ENVIRONMENT<p>.NET 10 · PostgreSQL 17 · Redis 8</p><small>10.000 başlangıç çalışanı tamamen sentetiktir. Eklenen çalışanlar da yalnızca test içindir.</small></div>
+  </aside>
+  <main>
+    <header id="overview" class="topbar">
+      <div><div class="eyebrow">REDISLAB / HUMAN RESOURCES</div><h1>People <em>Intelligence.</em></h1><p>Çalışanları yönet, Redis önbelleğini sorgula, ölç ve izle.</p></div>
+      <div class="header-tools"><span id="service-status" class="pill">● Kontrol ediliyor</span><button id="theme-toggle" class="button secondary" type="button">☾ Koyu tema</button><button id="refresh-all" class="button primary" type="button">↻ Verileri yenile</button><small id="last-refresh">Son yenileme: —</small></div>
+    </header>
 
-<section class="panel" id="redis-deep">
- <div class="panel-head"><div><div class="eyebrow">06 / REDIS INTERNALS</div><h2>Redis Motoru · Canlı Telemetri</h2><p>Redis INFO, DBSIZE, EXPIRE/TTL ve atomik INCR özelliklerini deneyerek gözlemle.</p></div><button id="redis-refresh" class="button secondary">↻ Metrikleri Yenile</button></div>
- <div class="redis-grid">
-  <div class="redis-tile"><small>Redis bellek tüketimi</small><strong id="redis-memory">—</strong></div>
-  <div class="redis-tile"><small>Redis toplam key sayısı (DBSIZE)</small><strong id="redis-keys">—</strong></div>
-  <div class="redis-tile"><small>Redis keyspace hit / miss</small><strong id="redis-keyspace">—</strong></div>
-  <div class="redis-tile"><small>Evicted / expired keys</small><strong id="redis-eviction">—</strong></div>
- </div>
- <div class="redis-explainer">
-  <article><b>Cache-aside</b><small>Veri önce Redis'te aranır, yoksa PostgreSQL'den getirilip TTL ile cache'lenir.</small></article>
-  <article><b>TTL / EXPIRE</b><small>Çalışan cache'i 300 saniye, dashboard özeti 60 saniye sonra otomatik sona erer.</small></article>
-  <article><b>Eviction / LRU</b><small>256 MB Redis sınırı. Bellek dolduğunda allkeys-lru ilkesi eski kullanım örüntülerine göre anahtar çıkarabilir.</small></article>
- </div>
-</section>
-<div class="section-grid">
-  <section class="panel"><div class="panel-head"><div><div class="eyebrow">07 / KEY INSPECTOR</div><h2>Redis Anahtar İnceleyici</h2><p>Seçilen çalışanın cache key'i, kalan TTL süresi ve değer boyutu.</p></div><span class="panel-icon">⌁</span></div>
-    <button id="inspect" class="button outline">🔎 Seçili ID'nin Cache Anahtarını İncele</button>
-    <div id="inspect-result" class="cache-result mono" aria-live="polite">Önce Redis Lab bölümünde bir çalışan sorgula.</div>
-  </section>
-  <section class="panel"><div class="panel-head"><div><div class="eyebrow">08 / ATOMIC OPERATIONS</div><h2>Redis INCR · Atomik Sayaç</h2><p>Redis'te eşzamanlı isteklerde bile atomik artan, 10 dakika TTL'li demo sayaç.</p></div><span class="panel-icon">＋</span></div>
-    <div id="counter-value" class="counter-number">0</div><div class="hint">Kalan TTL: <span id="counter-ttl">—</span> saniye</div>
-    <button id="counter-increment" class="button primary">+1 Atomik INCR Çalıştır</button>
-    <button id="counter-refresh" class="button secondary">Sayaç Durumunu Oku</button>
+    <section class="metrics" aria-label="Özet metrikleri">
+      <article class="metric"><label>TOPLAM ÇALIŞAN</label><strong id="total-employees">—</strong><small>PostgreSQL ana veri kaynağı</small></article>
+      <article class="metric"><label>ORTALAMA BRÜT MAAŞ</label><strong id="avg-salary">—</strong><small>Aylık / TRY</small></article>
+      <article class="metric"><label>TOPLAM MAAŞ YÜKÜ</label><strong id="total-payroll">—</strong><small>Aylık toplam</small></article>
+      <article class="metric"><label>UYGULAMA CACHE HIT</label><strong id="hit-rate">—</strong><small><span id="hits">0</span> hit · <span id="misses">0</span> miss</small></article>
+    </section>
+
+    <div class="two-cols" id="analysis">
+      <section class="panel"><div class="panel-heading"><div><div class="eyebrow">01 / PERSONEL</div><h2>Departman dağılımı</h2><p>Başlangıçta sekiz departman; kayıt değiştikçe güncellenir.</p></div><span class="decor-icon">▥</span></div><div id="departments" class="bar-list"><span class="muted">Yükleniyor...</span></div></section>
+      <section class="panel"><div class="panel-heading"><div><div class="eyebrow">02 / DEMOGRAFİ</div><h2>Şirket profili</h2><p>Sentetik çalışan verilerine göre.</p></div><span class="decor-icon">◎</span></div><div class="twostats"><div><small>Ortalama yaş</small><strong id="average-age">—</strong></div><div><small>Departman sayısı</small><strong id="department-count">—</strong></div></div><div id="genders" class="bar-list"></div><p class="hint">Bu veriler gerçek kişileri temsil etmez. Cinsiyet alanı kullanıcı tarafından girilen demo verisidir.</p></section>
+    </div>
+
+    <section class="panel" id="employees">
+      <div class="panel-heading wrap"><div><div class="eyebrow">03 / POSTGRESQL CRUD</div><h2>Çalışan yönetimi</h2><p>Yeni kişi ekle; ad, soyad, yaş, cinsiyet, departman, unvan, tarih ve maaş düzenle veya sil.</p></div><div class="panel-buttons"><span class="count-pill" id="filtered-total">— kayıt</span><button class="button primary" id="add-employee" type="button">＋ Yeni çalışan</button></div></div>
+      <div class="filters"><label class="sr-only" for="search">Çalışan ara</label><input id="search" type="search" placeholder="İsim, unvan veya ID ara..."><label class="sr-only" for="filter-dept">Departman</label><select id="filter-dept"><option value="">Tüm departmanlar</option></select><label class="sr-only" for="filter-gender">Cinsiyet</label><select id="filter-gender"><option value="">Tüm cinsiyetler</option><option>Kadın</option><option>Erkek</option><option>Belirtmek istemiyor</option></select><button class="button secondary" type="button" id="clear-filters">Filtreleri temizle</button></div>
+      <div class="table-scroll"><table><thead><tr><th>ID / İSİM</th><th>DEPARTMAN</th><th>UNVAN</th><th>YAŞ</th><th>CİNSİYET</th><th>BRÜT MAAŞ</th><th>İŞLEM</th></tr></thead><tbody id="employee-rows"><tr><td colspan="7">Yükleniyor...</td></tr></tbody></table></div>
+      <div class="pager"><span id="page-label">Sayfa —</span><div><button id="prev" class="button secondary" type="button">← Önceki</button><button id="next" class="button secondary" type="button">Sonraki →</button></div></div>
+    </section>
+
+    <div class="two-cols" id="redis-lab">
+      <section class="panel"><div class="panel-heading"><div><div class="eyebrow">04 / CACHE-ASIDE</div><h2>Çalışan Redis sorgusu</h2><p>İlk sorgu MISS → PostgreSQL; ikinci sorgu HIT → Redis.</p></div><span class="decor-icon">ϟ</span></div><div class="inline-fields"><label>ÇALIŞAN ID<input type="number" id="lookup-id" value="42" min="1" step="1"></label><button class="button primary" id="lookup" type="button">Sorgula</button></div><div class="quick"><button type="button" data-quick="1">#1</button><button type="button" data-quick="42">#42</button><button type="button" data-quick="1000">#1000</button></div><div id="lookup-result" class="output" aria-live="polite">Bir çalışan ID'si girip sorgula.</div></section>
+      <section class="panel"><div class="panel-heading"><div><div class="eyebrow">05 / CACHE İŞLEMLERİ</div><h2>Önbellek kontrolü</h2><p>Warm-up, namespace invalidation ve ölçüm.</p></div><span class="decor-icon">⚙</span></div><div class="control-row"><select id="warmup-size" aria-label="Cache yükleme boyutu"><option value="100">100 kayıt</option><option value="1000">1.000 kayıt</option><option value="10000">10.000 kayıt</option></select><button class="button primary" id="warmup" type="button">⚡ Redis'e yükle</button></div><div class="control-row"><button class="button secondary" id="reset-cache" type="button">↻ Cache reset</button><button class="button secondary" id="benchmark" type="button">◷ Benchmark (25×)</button></div><div id="benchmark-result" class="output">Henüz ölçüm yapılmadı.</div><small class="hint">Çalışan TTL 300 sn · Özet TTL 60 sn. Tek istemcili sentetik benchmark.</small></section>
+    </div>
+
+    <section class="panel" id="redis-engine"><div class="panel-heading wrap"><div><div class="eyebrow">06 / REDIS INTERNALS</div><h2>Redis motoru · Canlı telemetri</h2><p>INFO memory/stats, DBSIZE, keyspace HIT/MISS ve eviction.</p></div><button class="button secondary" id="redis-refresh" type="button">↻ Metrikleri yenile</button></div><div class="redis-stats"><div><small>Bellek tüketimi</small><strong id="redis-memory">—</strong></div><div><small>Toplam key sayısı</small><strong id="redis-keys">—</strong></div><div><small>Redis keyspace hit/miss</small><strong id="redis-keyspace">—</strong></div><div><small>Evicted / expired</small><strong id="redis-eviction">—</strong></div></div><p id="redis-error" class="hint"></p><div class="feature-tiles"><div><b>Cache-Aside</b><p>Redis'te yoksa PostgreSQL'den oku ve cache'le.</p></div><div><b>TTL / EXPIRE</b><p>Veriler süresi dolunca otomatik geçersizleşir.</p></div><div><b>LRU</b><p>256 MB sınırında eski kullanım örüntüsüne göre eviction yapılabilir.</p></div></div></section>
+    <div class="two-cols">
+      <section class="panel"><div class="panel-heading"><div><div class="eyebrow">07 / KEY INSPECTOR</div><h2>Redis anahtar inceleyici</h2><p>Seçili ID'nin cache key, TTL ve değer boyutu.</p></div></div><button id="inspect" type="button" class="button secondary">⌕ Anahtarı incele</button><div id="inspect-result" class="output monospace" aria-live="polite">Önce bir çalışan sorgula.</div></section>
+      <section class="panel"><div class="panel-heading"><div><div class="eyebrow">08 / ATOMIC INCR</div><h2>Redis atomik sayaç</h2><p>10 dakika TTL ile Redis üzerinde atomik artan sayaç.</p></div></div><div id="counter-value" class="counter">—</div><p class="hint">Kalan TTL: <b id="counter-ttl">—</b> saniye</p><div class="control-row"><button id="counter-increment" type="button" class="button primary">＋1 INCR</button><button id="counter-refresh" type="button" class="button secondary">Sayacı oku</button></div></section>
+    </div>
+
+    <section class="panel" id="events"><div class="panel-heading wrap"><div><div class="eyebrow">09 / ACTIVITY</div><h2>İşlem geçmişi</h2></div><button class="button secondary" id="clear-events" type="button">Geçmişi temizle</button></div><div id="event-list" class="events">Henüz işlem yok.</div></section>
+    <footer>Redis HR Lab V3 · Yalnızca sentetik verilerle geliştirme/test · Veriler PostgreSQL'de, cache Redis'te</footer>
+  </main>
+</div>
+<div id="modal-backdrop" class="modal-backdrop hidden" role="presentation">
+  <section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-head"><div><div class="eyebrow">PERSONEL KAYDI</div><h2 id="modal-title">Yeni çalışan</h2></div><button id="modal-close" class="button secondary" type="button" aria-label="Kapat">✕</button></div>
+    <form id="employee-form">
+      <div class="form-grid"><label>Ad <input id="f-first" name="firstName" autocomplete="off" required maxlength="60"></label><label>Soyad <input id="f-last" name="lastName" autocomplete="off" required maxlength="60"></label><label>Yaş <input id="f-age" name="age" type="number" required min="18" max="75"></label><label>Cinsiyet <select id="f-gender" name="gender" required><option value="">Seçiniz</option><option>Kadın</option><option>Erkek</option><option>Belirtmek istemiyor</option></select></label><label>Departman <select id="f-dept" name="department" required><option value="">Seçiniz</option></select></label><label>Unvan <input id="f-position" name="position" required maxlength="80" placeholder="Örnek: Yazılım Mühendisi"></label><label>Aylık brüt maaş (₺) <input id="f-salary" name="salary" type="number" required min="1000" max="1000000" step="0.01"></label><label>İşe giriş tarihi <input id="f-start" name="startDate" type="date" required></label></div>
+      <div class="modal-actions"><button type="button" id="delete-employee" class="button danger hidden">Çalışanı sil</button><span class="flex-spacer"></span><button type="button" id="form-cancel" class="button secondary">İptal</button><button type="submit" id="form-save" class="button primary">Kaydet</button></div>
+    </form>
   </section>
 </div>
-
-<section class="panel event-panel" id="events"><div class="panel-head"><div><div class="eyebrow">06 / ACTIVITY FEED</div><h2>İşlem Geçmişi</h2></div><button id="clear-events" class="button secondary">Temizle</button></div><div id="event-list" class="events"><div class="empty">İşlem yapıldığında burada görünecek.</div></div></section><footer><span>RedisLab HR Analytics · v2.0</span><span>ASP.NET Core 10 + PostgreSQL 17 + Redis 8 · Educational demo only</span></footer>
-</main></div><div id="toast" class="toast hidden" role="status"></div></body></html>
+<div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+</body>
+</html>
