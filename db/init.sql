@@ -12,7 +12,7 @@ CREATE TABLE employees (
 );
 WITH generated AS (
   SELECT n,
-    (ARRAY['Deniz','Ece','Mert','Elif','Arda','Derya','Can','Melis','Ozan','Selin','Eren','Pelin'])[((n*7)%12)+1] AS first_name,
+    CASE WHEN n%10=0 THEN (ARRAY['Deniz','Ekin','Özgür','Umut','Doğa','Toprak'])[((n/10)%6)+1] WHEN n%2=0 THEN (ARRAY['Ece','Elif','Selin','Melis','Derya','Ceren','Zeynep','Aylin','Aslı','İrem','Buse','Cansu'])[((n/2)%12)+1] ELSE (ARRAY['Mert','Arda','Ozan','Eren','Can','Kerem','Emre','Burak','Onur','Kaan','Mehmet','Ali'])[((n/2)%12)+1] END AS first_name,
     (ARRAY['Yılmaz','Demir','Kaya','Çelik','Şahin','Yıldız','Aydın','Öztürk','Arslan','Koç','Kurt','Aksoy'])[((n*11)%12)+1] AS last_name,
     (ARRAY['Yazılım','Siber Güvenlik','Network','Veri & AI','İnsan Kaynakları','Finans','Operasyon','Satış'])[((n-1)%8)+1] AS department,
     (ARRAY['Uzman','Kıdemli Uzman','Takım Lideri','Mühendis'])[((n/8)%4)+1] AS position,

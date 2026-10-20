@@ -55,7 +55,7 @@ GitHub Actions'ta `.github/workflows/ci.yml` aynı smoke testini çalıştıraca
 docker compose --profile tools up -d redisinsight
 ```
 
-http://localhost:5540 → Redis host: `redis`, port: `6379`.
+http://localhost:5540 → Redis host: `127.0.0.1`, port: `6379` (Codespaces ortak ağ yapılandırması).
 
 ## Sıfırlama / güvenlik
 
@@ -86,3 +86,40 @@ Script `Emocancell/Redis-DotNet-Lab` repository'sini geçici klasöre klonlar, p
 ## Test ve doğrulama
 
 `python3 scripts/smoke_test.py` gerçek çalışır ortamda PostgreSQL'in 10.000 kayıtla başlamasını, Redis HIT/MISS, güncelleme sonrası cache temizliği, warm-up ve benchmark endpoint'ini kontrol eder. GitHub Actions da Docker Compose ile bu testi çalıştırmak için yapılandırılmıştır. Kaynak kodun statik kontrolleri yapılsa da hazırlandığı ortamda Docker ve .NET SDK bulunmadığından gerçek runtime smoke testinin başarılı olduğu iddia edilmez.
+
+---
+
+## V2 — Açık Tema + Redis Motoru + Sentetik Adların Düzeltilmesi
+
+### Codespaces'te güvenli yükseltme
+
+Bu V2 ZIP paketini Codespaces'teki `Redis-DotNet-Lab` kök dizinine yükleyin; ardından:
+
+```bash
+unzip -o RedisHRLab-v2.zip -d .
+bash scripts/upgrade_v2.sh
+```
+
+`upgrade_v2.sh` önceki 10.000 örnek kaydın **yalnızca `full_name`** alanını demo cinsiyet etiketleriyle tutarlı hale getirir. Bir defaya mahsus yedek (`hrlab_names_before_v2`) alınır. **Maaş, yaş, unvan, departman, ID ve çalışma tarihleri korunur.** `db/init.sql` da sıfırdan kurulumlarda tutarlı sentetik isim üretecek biçimde güncellendi. Mevcut PostgreSQL volume'unu sıfırlamayın; `docker compose down -v` kullanmayın.
+
+**Kişi adından gerçek cinsiyet çıkarılamaz:** Buradaki eşleme yalnızca açıkça sentetik oluşturulmuş örnek veri için seçilmiş bir test kuralıdır.
+
+### Yeni özellikler
+
+- Açık tema varsayılan; koyu tema düğmesi ve tarayıcıda tercih hatırlama.
+- **Yenile** artık `/api/summary?fresh=true` ile PostgreSQL'den taze özet alır ve cache'i günceller. Buton durum/son yenileme saatini gösterir.
+- Redis `INFO memory/stats`, `DBSIZE`, **key inspector** ile kalan `TTL`/JSON boyutu.
+- Atomik `INCR` sayacı; 10 dakika TTL.
+- Geliştirilmiş hatalar ve `scripts/smoke_test.py` ile canlı end-to-end doğrulama.
+
+### V2 API uç noktaları
+
+| Metot | Yol | Açıklama |
+|---|---|---|
+| GET | `/api/summary?fresh=true` | Önbelleği atlayıp PostgreSQL'den taze özet getirir ve Redis'i günceller |
+| GET | `/api/redis/stats` | Redis INFO bellek/istatistik ve key sayısı |
+| GET | `/api/cache/inspect/42` | Çalışan key'i, TTL, kayıt boyutu |
+| GET | `/api/redis/counter` | INCR demo sayacı ve TTL |
+| POST | `/api/redis/counter/increment` | Redis atomik sayaç +1 |
+
+**Not:** Redis ve PostgreSQL aynı network namespace'ini paylaşır (`network_mode: service:postgres`); Codespaces'te tespit edilen ağ kısıtına özgü geliştirme çözümüdür. Üretime alınmadan önce servisler ayrılmalı; kimlik doğrulama ve güvenlik kontrolleri eklenmelidir. API'de gerçek HR verisi bulundurmayın.

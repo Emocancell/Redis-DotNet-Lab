@@ -16,6 +16,8 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
         ?? throw new InvalidOperationException("Redis connection is missing"));
     config.AbortOnConnectFail = false;
     config.ConnectRetry = 3;
+    // Yalnızca yerel Redis Lab sunucu istatistikleri için.
+    config.AllowAdmin = true;
     return ConnectionMultiplexer.Connect(config);
 });
 builder.Services.AddSingleton<Metrics>();
@@ -34,9 +36,9 @@ app.MapGet("/api/status", async (NpgsqlDataSource pg, IConnectionMultiplexer red
         count = (long)(await cmd.ExecuteScalarAsync() ?? 0L);
         pgOnline = true;
     }
-    catch (Exception ex) when (ex is NpgsqlException or TimeoutException) { }
+    catch (Exception ex) when (ex is NpgsqlException or TimeoutException) { app.Logger.LogWarning("PostgreSQL health kontrolü başarısız: {ErrorType}", ex.GetType().Name); }
     try { await redis.GetDatabase().PingAsync(); redisOnline = true; }
-    catch (Exception ex) when (ex is RedisException or TimeoutException) { }
+    catch (Exception ex) when (ex is RedisException or TimeoutException) { app.Logger.LogWarning("Redis health kontrolü başarısız: {ErrorType}", ex.GetType().Name); }
     return Results.Ok(new { postgresOnline = pgOnline, redisOnline, totalEmployees = count,
         hits = metrics.Hits, misses = metrics.Misses, writes = metrics.Writes,
         hitRate = metrics.Hits + metrics.Misses == 0 ? 0 : Math.Round(100.0 * metrics.Hits / (metrics.Hits + metrics.Misses), 1),
@@ -95,7 +97,7 @@ app.MapGet("/api/employees/{id:int}", async (int id, NpgsqlDataSource pg, IConne
     return Results.Ok(new { employee, source = "PostgreSQL", elapsedMs = Elapsed(watch) });
 });
 
-app.MapGet("/api/summary", async (NpgsqlDataSource pg, IConnectionMultiplexer redis) =>
+app.MapGet("/api/summary", async (bool? fresh, NpgsqlDataSource pg, IConnectionMultiplexer redis) =>
 {
     var watch = Stopwatch.StartNew();
     var cache = redis.GetDatabase();
@@ -104,7 +106,7 @@ app.MapGet("/api/summary", async (NpgsqlDataSource pg, IConnectionMultiplexer re
     {
         key = $"hrlab:summary:v{await Epoch(cache)}";
         var raw = await cache.StringGetAsync(key);
-        if (raw.HasValue)
+        if (fresh != true && raw.HasValue)
         {
             var saved = JsonSerializer.Deserialize<Summary>(raw.ToString());
             if (saved != null) return Results.Ok(new { data = saved, source = "Redis", elapsedMs = Elapsed(watch) });
@@ -215,7 +217,120 @@ app.MapGet("/api/benchmark/{id:int}", async (int id, int? runs, NpgsqlDataSource
     catch (Exception ex) when (ex is RedisException or TimeoutException) { return Results.Problem("Redis bağlantısı yok.", statusCode: 503); }
 });
 
+
+// Redis sunucu istatistikleri: INFO ve DBSIZE sunucu-seviyesi komutlardır.
+app.MapGet("/api/redis/stats", async (IConnectionMultiplexer redis) =>
+{
+    try
+    {
+        var endpoint = redis.GetEndPoints().FirstOrDefault();
+        if (endpoint is null)
+            return Results.Problem("Redis sunucu adresi bulunamadı.", statusCode: 503);
+
+        var server = redis.GetServer(endpoint);
+        var memoryInfo = await server.InfoAsync("memory");
+        var statisticsInfo = await server.InfoAsync("stats");
+        var memory = memoryInfo.SelectMany(group => group)
+            .ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal);
+        var stats = statisticsInfo.SelectMany(group => group)
+            .ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal);
+        var totalKeys = await server.DatabaseSizeAsync(0);
+
+        return Results.Ok(new
+        {
+            databaseKeys = totalKeys,
+            memoryBytes = InfoNumber(memory, "used_memory"),
+            memoryPeakBytes = InfoNumber(memory, "used_memory_peak"),
+            maxMemoryBytes = InfoNumber(memory, "maxmemory"),
+            redisHits = InfoNumber(stats, "keyspace_hits"),
+            redisMisses = InfoNumber(stats, "keyspace_misses"),
+            evictedKeys = InfoNumber(stats, "evicted_keys"),
+            expiredKeys = InfoNumber(stats, "expired_keys")
+        });
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Redis istatistikleri alınamadı");
+        return Results.Problem("Redis istatistikleri okunamadı; ayrıntı API loglarında.", statusCode: 503);
+    }
+});
+
+// Tekil cache anahtarını, kalan TTL ve JSON boyutunu denetle.
+app.MapGet("/api/cache/inspect/{id:int}", async (int id, IConnectionMultiplexer redis) =>
+{
+    if (id < 1 || id > 10000) return Results.BadRequest(new { error = "ID 1-10000 arası olmalı." });
+    try
+    {
+        var cache = redis.GetDatabase();
+        var key = await CacheKey(cache, id);
+        var value = await cache.StringGetAsync(key);
+        var ttl = value.HasValue ? await cache.KeyTimeToLiveAsync(key) : null;
+        return Results.Ok(new
+        {
+            key,
+            exists = value.HasValue,
+            ttlSeconds = ttl.HasValue ? (int)Math.Ceiling(ttl.Value.TotalSeconds) : 0,
+            valueBytes = value.HasValue ? System.Text.Encoding.UTF8.GetByteCount(value.ToString()) : 0,
+            policy = "Cache Aside | TTL 300 saniye"
+        });
+    }
+    catch (Exception ex) when (ex is RedisException or TimeoutException)
+    {
+        return Results.Problem("Redis anahtarı okunamadı.", statusCode: 503);
+    }
+});
+
+// Redis INCR atomik sayaç: uygulama süreç belleğinden bağımsız.
+app.MapGet("/api/redis/counter", async (IConnectionMultiplexer redis) =>
+{
+    try
+    {
+        var cache = redis.GetDatabase();
+        var value = await cache.StringGetAsync("hrlab:demo:counter");
+        var ttl = await cache.KeyTimeToLiveAsync("hrlab:demo:counter");
+        return Results.Ok(new { value = value.HasValue && long.TryParse(value.ToString(), out var n) ? n : 0L,
+            ttlSeconds = ttl.HasValue ? (int)Math.Ceiling(ttl.Value.TotalSeconds) : 0 });
+    }
+    catch (Exception ex) when (ex is RedisException or TimeoutException)
+    {
+        return Results.Problem("Redis sayacı okunamadı.", statusCode: 503);
+    }
+});
+
+app.MapPost("/api/redis/counter/increment", async (IConnectionMultiplexer redis) =>
+{
+    try
+    {
+        var cache = redis.GetDatabase();
+        const string key = "hrlab:demo:counter";
+        var count = await cache.StringIncrementAsync(key);
+        var ttl = await cache.KeyTimeToLiveAsync(key);
+        if (ttl is null) await cache.KeyExpireAsync(key, TimeSpan.FromMinutes(10));
+        return Results.Ok(new { value = count, ttlSeconds = (int)Math.Ceiling(
+            (await cache.KeyTimeToLiveAsync(key))?.TotalSeconds ?? 0) });
+    }
+    catch (Exception ex) when (ex is RedisException or TimeoutException)
+    {
+        return Results.Problem("Redis sayacı artırılamadı.", statusCode: 503);
+    }
+});
+
 app.Run();
+
+static Dictionary<string, string> ParseRedisInfo(string info)
+{
+    var result = new Dictionary<string, string>(StringComparer.Ordinal);
+    foreach (var line in info.Split('\n'))
+    {
+        var trimmed = line.Trim();
+        if (trimmed.Length == 0 || trimmed.StartsWith('#')) continue;
+        var colon = trimmed.IndexOf(':');
+        if (colon > 0) result[trimmed[..colon]] = trimmed[(colon + 1)..].Trim();
+    }
+    return result;
+}
+static long InfoNumber(Dictionary<string, string> info, string key) =>
+    info.TryGetValue(key, out var raw) && long.TryParse(raw, out var value) ? value : 0L;
 
 static Employee Read(NpgsqlDataReader r) => new(r.GetInt32(0), r.GetString(1), r.GetString(2),
     r.GetString(3), r.GetString(4), r.GetInt32(5), r.GetDecimal(6), r.GetDateTime(7));

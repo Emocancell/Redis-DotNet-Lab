@@ -22,8 +22,7 @@ services:
     image: redis:8-alpine
     network_mode: "service:postgres"
     depends_on:
-      postgres:
-        condition: service_healthy
+      postgres: { condition: service_healthy }
     command: ["redis-server", "--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
     volumes:
       - redisdata:/data
@@ -41,10 +40,8 @@ services:
       ConnectionStrings__Redis: "127.0.0.1:6379"
       ASPNETCORE_URLS: "http://+:8080"
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
     restart: unless-stopped
 
   redisinsight:
@@ -52,8 +49,7 @@ services:
     profiles: ["tools"]
     network_mode: "service:postgres"
     depends_on:
-      redis:
-        condition: service_healthy
+      redis: { condition: service_healthy }
     volumes:
       - insightdata:/data
 
