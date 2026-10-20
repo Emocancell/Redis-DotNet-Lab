@@ -21,7 +21,7 @@ for attempt in range(40):
         status = request("/api/status")
         if status.get("postgresOnline") and status.get("redisOnline"):
             break
-    except (urllib.error.URLError, TimeoutError, ValueError):
+    except (urllib.error.URLError, ConnectionError, TimeoutError, ValueError):
         pass
     time.sleep(2)
 else:
